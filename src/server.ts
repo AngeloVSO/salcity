@@ -84,7 +84,9 @@ app.post("/auth/login", async (request, response) => {
     secret
   );
 
-  return response.status(201).json({ success: "Usuário logado com sucesso!" });
+  return response
+    .status(201)
+    .json({ success: "Usuário logado com sucesso!", token });
 });
 
 app.post("/cards", checkToken, async (request, response) => {
