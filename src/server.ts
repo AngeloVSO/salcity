@@ -54,7 +54,7 @@ app.post("/auth/register", async (request, response) => {
   return response.json(userCreated);
 });
 
-app.get("/auth/login", async (request, response) => {
+app.post("/auth/login", async (request, response) => {
   const { username, password } = request.body;
 
   if (!username && !password) {
@@ -84,13 +84,17 @@ app.get("/auth/login", async (request, response) => {
     secret
   );
 
-  return response
-    .status(200)
-    .json({ success: "Usuário logado com sucesso!", token });
+  return response.status(201).json({ success: "Usuário logado com sucesso!" });
 });
 
 app.post("/cards", checkToken, async (request, response) => {
   const { name, imageUrl } = request.body;
+
+  if (!name || !imageUrl) {
+    return response
+      .status(400)
+      .json({ error: "Necessário informa nome e link da carta" });
+  }
 
   const verifyIfExistsCard = await prismaClient.card.findFirst({
     where: {
