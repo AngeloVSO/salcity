@@ -36,7 +36,7 @@ app.post("/auth/register", async (request, response) => {
   if (verifyIfExistsUser)
     return response
       .status(400)
-      .json({ error: "Usurário já cadastrado com esse nome ou email" });
+      .json({ error: "Usurário já cadastrado com esse username ou email" });
 
   const salt = await bcrypt.genSalt(12);
   const passwordHash = await bcrypt.hash(password, salt);
@@ -47,7 +47,7 @@ app.post("/auth/register", async (request, response) => {
       name,
       email,
       password: passwordHash,
-      role: role ? process.env.ROLE_ADMIN! : "user",
+      role: role === process.env.ROLE_ADMIN! ? role : "user",
     },
   });
 
@@ -57,7 +57,7 @@ app.post("/auth/register", async (request, response) => {
 app.get("/auth/login", async (request, response) => {
   const { email, username, password } = request.body;
 
-  if (!email || !password || !username) {
+  if ((!email && !password) || (!username && !password)) {
     return response.status(422).json({ error: "Credenciais inválidas" });
   }
 
