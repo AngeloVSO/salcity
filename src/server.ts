@@ -1,11 +1,11 @@
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 import { prismaClient } from "./prisma/client";
 import Jwt from "jsonwebtoken";
+import { SECRET, SECURITY_ROLE } from "./security";
 
-dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -47,7 +47,7 @@ app.post("/auth/register", async (request, response) => {
       name,
       email,
       password: passwordHash,
-      role: role === process.env.ROLE_ADMIN! ? role : "user",
+      role: role === SECURITY_ROLE.ADMIN ? role : SECURITY_ROLE.USER,
     },
   });
 
@@ -55,18 +55,15 @@ app.post("/auth/register", async (request, response) => {
 });
 
 app.get("/auth/login", async (request, response) => {
-  const { email, username, password } = request.body;
+  const { username, password } = request.body;
 
-  if ((!email && !password) || (!username && !password)) {
-    return response.status(422).json({ error: "Credenciais inválidas" });
+  if (!username && !password) {
+    return response.status(422).json({ error: "Preencha email e senha" });
   }
 
   const user = await prismaClient.user.findFirst({
     where: {
       username,
-      OR: {
-        email,
-      },
     },
   });
 
@@ -78,10 +75,11 @@ app.get("/auth/login", async (request, response) => {
   if (!checkPassword)
     return response.status(400).json({ error: "Credenciais inválidas" });
 
-  const secret = process.env.SECRET!;
+  const secret = SECRET;
   const token = Jwt.sign(
     {
       id: user.id,
+      role: user.role,
     },
     secret
   );
@@ -91,7 +89,7 @@ app.get("/auth/login", async (request, response) => {
     .json({ success: "Usuário logado com sucesso!", token });
 });
 
-app.post("/cards", async (request, response) => {
+app.post("/cards", checkToken, async (request, response) => {
   const { name, imageUrl } = request.body;
 
   const verifyIfExistsCard = await prismaClient.card.findFirst({
@@ -104,7 +102,7 @@ app.post("/cards", async (request, response) => {
   });
 
   if (verifyIfExistsCard)
-    return response.status(400).json({ error: "Card already exists" });
+    return response.status(400).json({ error: "Carta já cadastrada" });
 
   const cardCreated = await prismaClient.card.create({
     data: {
@@ -116,7 +114,7 @@ app.post("/cards", async (request, response) => {
   return response.json(cardCreated);
 });
 
-app.put("/cards", async (request, response) => {
+app.put("/cards", checkToken, async (request, response) => {
   const { name, imageUrl } = request.body;
 
   const verifyIfExistsCard = await prismaClient.card.findFirst({
@@ -126,7 +124,7 @@ app.put("/cards", async (request, response) => {
   });
 
   if (!verifyIfExistsCard)
-    return response.status(400).json({ error: "Card doesn't exists" });
+    return response.status(400).json({ error: "Carta ainda não cadastrada" });
 
   const cardCreated = await prismaClient.card.update({
     where: {
@@ -157,5 +155,22 @@ app.get("/cards", async (request, response) => {
 
   return response.json(cards);
 });
+
+function checkToken(request: Request, response: Response, next: NextFunction) {
+  const authHeader = request.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
+  if (!token) {
+    return response.status(401).json({ error: "Acesso não autorizado" });
+  }
+
+  try {
+    const secret = SECRET;
+    Jwt.verify(token, secret!);
+    next();
+  } catch (error) {
+    response.status(400).json({ error: "Token inválido" });
+  }
+}
 
 app.listen(3333, () => console.log("Server is runnig in port 3333"));
